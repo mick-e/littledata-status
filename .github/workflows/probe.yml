@@ -8,6 +8,10 @@ name: Probe
 # not trigger this one again. GitHub can start a scheduled run late or skip it
 # under load; the page says when it was last checked and warns once that is
 # over an hour ago.
+#
+# Two jobs, as GitHub's own Pages workflow has them: deploy-pages in the same
+# job as the upload found no artifact 0.75 s after it was uploaded (run
+# 42740640674). Each job also holds only the permissions it uses.
 
 on:
   schedule:
@@ -16,10 +20,7 @@ on:
   push:
     branches: [main]
 
-permissions:
-  contents: write
-  pages: write
-  id-token: write
+permissions: {}
 
 concurrency:
   group: probe
@@ -29,9 +30,8 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -58,5 +58,16 @@ jobs:
         with:
           path: site
 
+  deploy:
+    needs: probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
       - id: deploy
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
