@@ -1,0 +1,4 @@
+site/index.html
+site/status.json
+__pycache__/
+*.pyc

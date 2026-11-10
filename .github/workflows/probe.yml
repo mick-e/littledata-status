@@ -1,0 +1,62 @@
+name: Probe
+
+# Checks https://littledata.ai about every 15 minutes (probe.py), keeps the
+# results in data/history.json and publishes site/ to GitHub Pages.
+#
+# Runs on this repository's own GITHUB_TOKEN: no personal token or secret. A
+# commit pushed with that token starts no workflow, so the history commits do
+# not trigger this one again. GitHub can start a scheduled run late or skip it
+# under load; the page says when it was last checked and warns once that is
+# over an hour ago.
+
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Test the probe
+        run: python3 -m unittest -q test_probe
+
+      - name: Check littledata.ai and build the page
+        run: python3 probe.py
+
+      - name: Keep the history
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/history.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -q -m "Status check $(date -u +%Y-%m-%dT%H:%MZ)"
+          for attempt in 1 2 3; do
+            if git push -q origin HEAD:main; then exit 0; fi
+            git pull -q --rebase origin main
+          done
+          exit 1
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
